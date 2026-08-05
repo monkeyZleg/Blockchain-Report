@@ -60,33 +60,63 @@ CryptoLend supports two independent ways to open an account, and neither is the 
 | Password         | Required, minimum 8 characters. A live strength meter (Very weak to Very strong) scores length, casing, digits and symbols |
 | Confirm password | Must match                                                                                                                 |
 
-Flow:
+*Flow:*
 1. Fill in the form.
 2. Click **Create Account** (disabled until all required fields are valid and the passwords match).
 3. The account is created and the user is **immediately signed in** (no separate login step).
 4. Redirect to `/dashboard`.
 
 ![CreateAcc_Email](CreateAcc_Email.png)
+<center><u>Figure 7.1.1: Sign up page</u></center>
 
 
 **B. Continue with MetaMask**
-
-Flow:
+![](images/SignUpMM.png)
+<center><u>Figure 7.1.2: Login with MetaMask (Confirmation) page</u></center>
+*Flow:*
 1. Click **Continue with MetaMask**, and MetaMask's account picker opens.
 2. The app requests a one-time nonce and has the wallet sign a `"Sign in to CryptoLend"` message over it (this proves ownership without ever touching a private key).
 3. The signature is verified server-side.
-4. Since the wallet is new, an account is created automatically with an auto-generated display name (e.g. `0x1234...abcd`) and no email/password.
+4. Since the wallet is new, an account is created automatically with an auto-generated display name (e.g. `0x7099…79c8`) and no email/password.
 5. The user is signed in and redirected to `/dashboard`.
+
+![](images/MMUsername&Password.png)
+<center><u>Figure 7.1.3: MetaMask Registered Account without Email and Password</u></center>
 
 Both paths write to the same `User` table and produce a normal signed-in session. A wallet-only account can add an email/password later from [Settings](#714-settings), and an email/password account can link a wallet later the same way.
 
 Sign-ups can be temporarily closed by an admin via the `auth.signup` feature flag (see [7.12](#712-admin-panel)). This is checked on every submit, not just at page load.
 
-![Sign-up page showing the email/password form and the "Continue with MetaMask" option](images/7.1-signup.png)
-*Figure 7.1.1: Sign-up page*
 
 ```solidity
-// TODO: paste web/src/app/api/auth/signup/route.ts (or wallet-login/route.ts), the POST handler
+import { NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
+import { prisma } from '@/lib/db/prisma';
+import { createToken, setAuthCookie } from '@/lib/auth-jwt';
+import { featureBlocked } from '@/lib/features-server';
+
+export async function POST(req: Request) {
+
+  // Registration can be closed from the admin feature panel.
+  const blocked = await featureBlocked('auth.signup');
+  if (blocked) return blocked;
+
+  const { name, email, password } = await req.json();
+  if (!email || !password) return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+  if (password.length < 8) return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
+
+  const normalEmail = (email as string).toLowerCase().trim();
+  const existing = await prisma.user.findUnique({ where: { email: normalEmail } });
+  if (existing) return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
+
+  const hash = await bcrypt.hash(password, 12);
+  const user = await prisma.user.create({ data: { name: name?.trim() || null, email: normalEmail, password: hash } });
+  const token = await createToken({
+    id: user.id, email: user.email, name: user.name, epoch: user.sessionEpoch,
+  });
+  await setAuthCookie(token);
+  return NextResponse.json({ id: user.id, email: user.email, name: user.name }, { status: 201 });
+}
 ```
 
 ---
