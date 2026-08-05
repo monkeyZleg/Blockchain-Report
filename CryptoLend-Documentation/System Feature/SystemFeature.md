@@ -179,6 +179,10 @@ export async function POST(req: Request) {
 
 The Dashboard is the app's home screen once signed in, and the entry point to every lending action.
 
+
+![Dashboard overview showing the status header, protocol stats, and the four live position cards](images/DashboardOverview.png)
+<center><u>Figure 7.3.1: Dashboard overview (User)</u></center>
+
 - **Status header**: connection state (`Connected · 0x1234...abcd · Chain 31337`), a *Live* chip, and a *KYC Verified* / *Admin, full access* chip once entitled.
 - **Protocol stats banner**: four figures, of which only the **ETH/MYR price** is genuinely live (read from the contract's price oracle). Total Value Locked, Active Loans and Total Borrowed here are illustrative demo figures, not computed from real state. Worth being explicit about this in the write-up rather than presenting them as live analytics.
 - **Your position**: four live cards once connected: My Collateral, Outstanding Debt, Net Position, Health Factor (with a plain-English risk sentence, e.g. *"At Risk: liquidates if ETH falls to or below RM X"*).
@@ -186,14 +190,41 @@ The Dashboard is the app's home screen once signed in, and the entry point to ev
 - **Markets & Calculator panel**: a 9-asset rate table (price, 24h sparkline, Max LTV, Borrow/Supply APR, liquidity) feeding a "what could I borrow" calculator: collateral amount, an LTV slider, a loan-term picker, and a "Hold vs. Sell" comparison tool that estimates the payoff of borrowing against an asset instead of selling it. **Important caveat for the write-up:** this calculator is illustrative across all 9 assets, but the platform's real collateral asset is **ETH only**. The five action tabs below only ever move ETH and MYR.
 - **Manage Position dialog**: one modal, opened via `/dashboard?tab=deposit|withdraw|borrow|repay|buy`, holding all five core actions described in [7.7 to 7.11](#main-lending-features-5-core-actions). A shared header shows a KYC-pending banner where relevant, a live transaction status banner (pending/success/error, with step-by-step progress for multi-step transactions), and, once the user has a position, a summary strip (Collateral / Borrowed / Earning / Health).
 
-![Dashboard overview showing the status header, protocol stats, and the four live position cards](images/7.3-dashboard-overview.png)
-*Figure 7.3.1: Dashboard overview*
 
-![Markets & Calculator panel with an asset selected and the borrow calculator expanded](images/7.3-dashboard-calculator.png)
-*Figure 7.3.2: Markets & Calculator panel*
+![Markets & Calculator panel with an asset selected and the borrow calculator expanded](images/MarketCalculator.png)
+<center><u>Figure 7.3.2: Markets & Calculator panel</u></center>
 
 ```ts
-// TODO: paste the health-factor / live-position read logic from web/src/lib/WalletContext.tsx
+// health-factor / live-position read logic from web/src/lib/WalletContext.tsx
+
+function readCachedPosition(addr: string): CachedPosition | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(LS_KEY(addr));
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    return {
+      info: {
+        collateral:         BigInt(d.info.collateral),
+        borrowed:           BigInt(d.info.borrowed),
+        available:          BigInt(d.info.available),
+        accruedInterest:    BigInt(d.info.accruedInterest),
+        startTime:          BigInt(d.info.startTime),
+        // Falls back to startTime for cache entries written before this field.
+        lastRepayTime:      BigInt(d.info.lastRepayTime ?? d.info.startTime ?? 0),
+        healthFactor:       d.info.healthFactor === 'Infinity' ? Infinity : Number(d.info.healthFactor),
+        collateralValueMYR: Number(d.info.collateralValueMYR),
+        ltv:                Number(d.info.ltv),
+        isLiquidatable:     Boolean(d.info.isLiquidatable),
+      },
+
+      ethBalance: d.ethBalance ?? '0',
+      myrBalance: d.myrBalance ?? '0',
+      ethPriceMYR: Number(d.ethPriceMYR) || 18000,
+      savedAt: Number(d.savedAt) || 0,
+    };
+  } catch { return null; }
+}
 ```
 
 ---
@@ -397,6 +428,10 @@ On confirmation, `buyMYR(myrAmount)` is called with slightly more ETH attached t
 
 **Access:** Admin accounts only. **Route:** `/admin/*`. Enforced three times independently (edge middleware, a server-side layout guard that re-reads the live account on every request, and a per-route API guard), so that revoking someone's admin flag takes effect immediately rather than waiting for their session to expire.
 
+
+![](images/DashboardOverviewAdmin.png)
+<center><u>Figure 7.12.1: Dashboard overview (Admin)</u></center>
+
 The admin panel is explicitly scoped to **off-chain enforcement**: restricting a user, for example, stops CryptoLend's own app from acting for them, but cannot stop their wallet from calling the smart contract directly. That boundary is stated in the product itself, and is worth restating in the write-up as a deliberate design decision, not a gap. Six areas, plus one fund-moving action:
 
 - **Overview** (`/admin`): a protocol health dashboard with live treasury figures (contract ETH balance, MYR supply, protocol fees), live on-chain rates, aggregate KPIs (total borrowed, unique wallets, transaction count), charts, and recent activity/audit feeds. Read-only except for the fee-withdrawal button described below.
@@ -407,8 +442,6 @@ The admin panel is explicitly scoped to **off-chain enforcement**: restricting a
 - **Audit Log** (`/admin/audit`): an append-only, unfilterable-by-design trail of every admin mutation across all of the above (who, what, when, before/after detail). There is deliberately no edit or delete endpoint for it.
 - **Withdraw Protocol Fees**: a single button on the Overview page's treasury card. The contract's `withdrawProtocolFees` always pays out to the contract's own on-chain `owner()` address, never anywhere client-supplied, and is gated behind a confirmation prompt.
 
-![Admin Overview page showing protocol treasury, live rates, and KPI cards](images/7.12-admin-overview.png)
-*Figure 7.12.1: Admin Panel, Overview*
 
 ![Admin KYC review queue with a submission's detail view open](images/7.12-admin-kyc-queue.png)
 *Figure 7.12.2: Admin Panel, KYC review*

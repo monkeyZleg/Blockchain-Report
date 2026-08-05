@@ -20,8 +20,23 @@
               "icon": "lucide-file",
               "title": "SystemFeature"
             }
+          },
+          {
+            "id": "4a1e951458992a17",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "CryptoLend-Documentation/System Feature/SystemFeature.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "SystemFeature"
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -184,13 +199,20 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "698798d1c38dc1bb",
+  "active": "4a1e951458992a17",
   "lastOpenFiles": [
-    "CryptoLend-Documentation/System Feature/images/loginSelection.png",
-    "CryptoLend-Documentation/System Feature/images/MMUsername&Password.png",
+    "CryptoLend-Documentation/System Feature/images/MarketCalculator.png",
+    "CryptoLend-Documentation/System Feature/images/DashboardCalculator.png",
+    "CryptoLend-Documentation/System Feature/images/DashboardOverview.png",
     "CryptoLend-Documentation/System Feature/SystemFeature.md",
-    "Pasted image 20260806001855.png",
-    "CryptoLend-Documentation/System Feature/images/SignUpMM.png",
+    "CryptoLend-Documentation/System Feature/images/KYC_Approval.png",
+    "CryptoLend-Documentation/System Feature/images/DashboardOverviewAdmin.png",
+    "CryptoLend-Documentation/System Feature/images/KYC_Pending.png",
+    "CryptoLend-Documentation/System Feature/images/KYC_Review.png",
+    "CryptoLend-Documentation/System Feature/images/KYC_Document.png",
+    "CryptoLend-Documentation/System Feature/images/KYC_Financial.png",
+    "CryptoLend-Documentation/System Feature/images/KYC_Address.png",
+    "CryptoLend-Documentation/System Feature/images/KYC_PersonalInfo.png",
     "images/SignUpMM.md",
     "images/Si.md",
     "images",
