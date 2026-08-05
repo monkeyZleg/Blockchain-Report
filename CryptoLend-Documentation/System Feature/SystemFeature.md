@@ -1,26 +1,3 @@
-# CryptoLend Project Documentation
-
-**Module:** CT124-3-3-BCD (Blockchain Computing and Development)
-**Assignment:** Group Assignment, Part 2 (Solution Implementation)
-**Group No.:** `TODO`
-**Submission date:** `TODO`
-
-## Group members & section ownership
-
-| # | Section | Owner |
-|---|---|---|
-| 1 | [Introduction](#1-introduction) | `[Your name]` |
-| 2 | [System Architecture](#2-system-architecture) | `[Your name]` |
-| 3 | [Technology Stack](#3-technology-stack) | `[Your name]` |
-| 4 | [Installation Guide](#4-installation-guide) | `[Your name]` |
-| 5 | [Running the System](#5-running-the-system) | `[Your name]` |
-| 6 | [Smart Contract Deployment](#6-smart-contract-deployment) | Jian Zhi |
-| 7 | [System Features](#7-system-features) | Ben & KS |
-| 8 | [Database Design](#8-database-design) | Jian Zhi |
-| 9 | [Smart Contract Overview](#9-smart-contract-overview) | Jian Zhi |
-| 10 | [Folder Structure](#10-folder-structure) | `[Your name]` |
-| 11 | [Troubleshooting](#11-troubleshooting) | `TODO: unassigned, please confirm` |
-| 12 | [Future Improvements](#12-future-improvements) | `[Your name]` |
 
 ## 7. System Features
 
@@ -88,7 +65,7 @@ Both paths write to the same `User` table and produce a normal signed-in session
 Sign-ups can be temporarily closed by an admin via the `auth.signup` feature flag (see [7.12](#712-admin-panel)). This is checked on every submit, not just at page load.
 
 
-```solidity
+```ts
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db/prisma';
@@ -134,11 +111,64 @@ Flow:
 
 Sign-in can be paused independently via the `auth.login` flag. Admin accounts are explicitly exempt from this, so the team can never lock itself out of the admin panel.
 
-![Login page showing the email/password form and the "Continue with MetaMask" option](images/7.2-login.png)
-*Figure 7.2.1: Login page*
+![Login page showing the email/password form and the "Continue with MetaMask" option](images/loginSelection.png)
+<center><u>*Figure 7.2.1: Login page*</u></center>
 
 ```ts
-// TODO: paste web/src/app/api/auth/login/route.ts, the POST handler
+import { NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
+import { prisma } from '@/lib/db/prisma';
+import { createToken, setAuthCookie } from '@/lib/auth-jwt';
+import { featureBlocked } from '@/lib/features-server';
+
+  
+export async function POST(req: Request) {
+  try {
+    const { email, password } = await req.json();
+    if (!email || !password) return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+
+    const normalEmail = (email as string).toLowerCase().trim();
+    let user;
+    try {
+      user = await prisma.user.findUnique({ where: { email: normalEmail } });
+    } catch (err) {
+      console.error('[login] DB error:', err);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
+
+    if (!user?.password) return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
+
+    // Sign-in can be paused from the admin feature panel — but only after the
+    // password is verified, and never for admins. Checking it here rather than
+    // at the top means a paused login cannot be used to probe which emails
+    // exist, and guarantees an admin can always get back in to un-pause it.
+    if (!user.isAdmin) {
+      const blocked = await featureBlocked('auth.login');
+      if (blocked) return blocked;
+    }
+
+    const token = await createToken({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      isAdmin: user.isAdmin,
+      epoch: user.sessionEpoch,
+    });
+
+    await setAuthCookie(token);
+
+    return NextResponse.json({
+      id: user.id, email: user.email, name: user.name,
+      isAdmin: user.isAdmin, status: user.status,
+    });
+  } catch (err) {
+    console.error('[login] Unexpected error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
 ```
 
 ---
@@ -438,46 +468,3 @@ Two self-service panels:
 ```
 
 ---
-
-## 8. Database Design
-
-*Owner: Jian Zhi. Content pending.*
-
-Suggested contents: an ER diagram plus a table-by-table walkthrough of the Prisma schema (`web/prisma/schema.prisma`). [`SYSTEM_OVERVIEW.md`](../SYSTEM_OVERVIEW.md) has a starting summary of the core models (`User`, `KycSubmission`, `LoanTransaction`, `FeatureFlag`, `AdminAuditLog`) worth expanding into full field lists, types, and relations. Skip `BankAccount`/`BankTransfer` if they're still in the schema file, since Bank Transfer is being removed from the product.
-
----
-
-## 9. Smart Contract Overview
-
-*Owner: Jian Zhi. Content pending.*
-
-Suggested contents: walk through `blockchain/contracts/CryptoLoan.sol`, covering the state variables, the constants that define the risk model (70% max LTV, 80% liquidation threshold, 5% liquidator bonus, health-factor formula), the events emitted, and the full function list (the same functions already detailed feature-by-feature in [Section 7](#7-system-features), but presented here from the contract's point of view rather than the UI's). Also cover `MockMYR.sol` (the 6-decimal ERC-20 the loan contract mints) and, if relevant to your scope, `ICO.sol`/`RinggitToken.sol` behind the separate `/ico` page.
-
----
-
-## 10. Folder Structure
-
-*Owner: `[Your name]`. Content pending.*
-
-Suggested contents: the top-level split (`blockchain/` vs `web/`, two independent npm projects) and an annotated tree of the meaningful folders: `web/src/app/` (routes), `web/src/app/api/` (API routes), `web/src/components/`, `web/src/lib/`, `web/prisma/`, `blockchain/contracts/`, `blockchain/scripts/`. Enough for a marker to navigate the submitted zip without guessing.
-
----
-
-## 11. Troubleshooting
-
-*Owner: `TODO: unassigned, please confirm who's covering this.`*
-
-Suggested contents, based on constraints already visible in the codebase and setup docs: what to do if MetaMask's nonce gets out of sync after restarting the Hardhat node (reset the account in MetaMask), why contracts must be redeployed after a node restart (`FORCE_DEPLOY=1`), what a "Price move too large" or "Exceeds max LTV" revert means, and what the Dashboard's own price-mismatch warning is telling you.
-
----
-
-## 12. Future Improvements
-
-*Owner: `[Your name]`. Content pending.*
-
-Ideas already implied by the current implementation's own limitations (useful starting points, expand or replace freely):
-
-- Real collateral support for assets beyond ETH (the Markets/Dashboard calculators already model nine, but only ETH is wired to the contract).
-- Automated or third-party KYC document verification instead of manual admin review.
-- A real liquidation bot against the existing `liquidate()` function and whitelisted-liquidator role, which currently has no UI at all.
-- On-chain governance for parameters (LTV, liquidation threshold) that are presently owner-only.
