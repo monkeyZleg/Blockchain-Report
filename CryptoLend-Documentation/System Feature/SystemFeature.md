@@ -183,7 +183,7 @@ The Dashboard is the app's home screen once signed in, and the entry point to ev
 ![Dashboard overview showing the status header, protocol stats, and the four live position cards](images/DashboardOverview.png)
 <center><u>Figure 7.3.1: Dashboard overview (User)</u></center>
 
-- **Status header**: connection state (`Connected · 0x1234...abcd · Chain 31337`), a *Live* chip, and a *KYC Verified* / *Admin, full access* chip once entitled.
+- **Status header**: connection state (`Connected · 0x7099…79c8` · Chain 31337), a *Live* chip, and a *KYC Verified* / *Admin, full access* chip once entitled.
 - **Protocol stats banner**: four figures, of which only the **ETH/MYR price** is genuinely live (read from the contract's price oracle). Total Value Locked, Active Loans and Total Borrowed here are illustrative demo figures, not computed from real state. Worth being explicit about this in the write-up rather than presenting them as live analytics.
 - **Your position**: four live cards once connected: My Collateral, Outstanding Debt, Net Position, Health Factor (with a plain-English risk sentence, e.g. *"At Risk: liquidates if ETH falls to or below RM X"*).
 - **Price self-healing**: if the on-chain price oracle drifts more than 3% from the live market price, a warning appears with a manual **Sync Price** button. The app also retries this automatically in the background.
@@ -287,11 +287,76 @@ A public, read-only feed of on-chain protocol activity, deliberately scrubbed of
 - **Filter bar**: free-text search (matches a wallet, a transaction hash, or a block number), event type, sort order, and a date range.
 - **Table**: Block number, Type (colour-coded), Amount, Wallet (shortened), Tx Hash (shortened), and a relative timestamp ("2m ago"). The table is paginated.
 
-![Explorer page showing the live transaction feed with type filters and the activity summary cards](images/7.6-explorer.png)
-*Figure 7.6.1: Public transaction explorer*
+![Explorer page showing the live transaction feed with type filters and the activity summary cards](images/ExplorerActive.png)
+<center><u>Figure 7.6.1: Public transaction explorer</u></center>
 
 ```ts
-// TODO: paste the query builder from web/src/app/api/explorer/route.ts (or lib/tx-query.ts)
+// Query builder from web/src/app/api/explorer/route.ts (or lib/tx-query.ts)
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db/prisma';
+import { getFlags } from '@/lib/features-server';
+import { isHidden } from '@/lib/features';
+import { buildTxWhere, parseTxFilters, shortWallet } from '@/lib/tx-query';
+
+export async function GET(req: NextRequest) {
+  const flags = await getFlags();
+  if (isHidden(flags, 'page.explorer')) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  
+  const sp      = req.nextUrl.searchParams;
+  const filters = parseTxFilters(sp);
+  const page    = Math.max(1, Number(sp.get('page') ?? 1) || 1);
+  const pageSize = Math.min(100, Math.max(10, Number(sp.get('pageSize') ?? 25) || 25));
+
+  // Chronological (oldest first) by default — reads like a ledger; the UI
+  // offers newest-first as an option.
+
+  const order: 'asc' | 'desc' = sp.get('order') === 'desc' ? 'desc' : 'asc';
+  const where = buildTxWhere(filters);
+
+
+  try {
+    const [total, rows, stats] = await Promise.all([
+      prisma.loanTransaction.count({ where }),
+      prisma.loanTransaction.findMany({
+        where,
+        orderBy: [{ blockNumber: order }, { createdAt: order }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: { id: true, wallet: true, type: true, amount: true, txHash: true, blockNumber: true, createdAt: true },
+      }),
+      prisma.loanTransaction.groupBy({ by: ['type'], _count: { _all: true } }),
+    ]);
+
+    return NextResponse.json({
+      txs: rows.map(t => ({
+        id:          t.id,
+        type:        t.type,
+        amount:      t.amount,
+        blockNumber: t.blockNumber,
+        createdAt:   t.createdAt,
+
+        // Truncated server-side: the full address is never sent to a public
+        // client, so it cannot be recovered from the network tab.
+
+        wallet:      shortWallet(t.wallet),
+        txHash:      `${t.txHash.slice(0, 12)}…${t.txHash.slice(-8)}`,
+      })),
+
+      total,
+      page,
+      pageSize,
+      pages: Math.max(1, Math.ceil(total / pageSize)),
+      byType: Object.fromEntries(stats.map(s => [s.type, s._count._all])),
+    });
+
+  } catch (err) {
+    console.error('[GET /api/explorer]', err);
+    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+  }
+}
 ```
 
 ---
