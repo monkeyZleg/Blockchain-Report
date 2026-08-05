@@ -7,20 +7,20 @@
 
 ## Group members & section ownership
 
-| # | Section | Owner |
-|---|---|---|
-| 1 | [Introduction](#1-introduction) | `[Your name]` |
-| 2 | [System Architecture](#2-system-architecture) | `[Your name]` |
-| 3 | [Technology Stack](#3-technology-stack) | `[Your name]` |
-| 4 | [Installation Guide](#4-installation-guide) | `[Your name]` |
-| 5 | [Running the System](#5-running-the-system) | `[Your name]` |
-| 6 | [Smart Contract Deployment](#6-smart-contract-deployment) | Jian Zhi |
-| 7 | [System Features](#7-system-features) | Ben & KS |
-| 8 | [Database Design](#8-database-design) | Jian Zhi |
-| 9 | [Smart Contract Overview](#9-smart-contract-overview) | Jian Zhi |
-| 10 | [Folder Structure](#10-folder-structure) | `[Your name]` |
-| 11 | [Troubleshooting](#11-troubleshooting) | `TODO: unassigned, please confirm` |
-| 12 | [Future Improvements](#12-future-improvements) | `[Your name]` |
+| #   | Section                                                   | Owner                              |
+| --- | --------------------------------------------------------- | ---------------------------------- |
+| 1   | [Introduction](#1-introduction)                           | `[Your name]`                      |
+| 2   | [System Architecture](#2-system-architecture)             | `[Your name]`                      |
+| 3   | [Technology Stack](#3-technology-stack)                   | `[Your name]`                      |
+| 4   | [Installation Guide](#4-installation-guide)               | `[Your name]`                      |
+| 5   | [Running the System](#5-running-the-system)               | `[Your name]`                      |
+| 6   | [Smart Contract Deployment](#6-smart-contract-deployment) | Jian Zhi                           |
+| 7   | [System Features](#7-system-features)                     | Ben & KS                           |
+| 8   | [Database Design](#8-database-design)                     | Jian Zhi                           |
+| 9   | [Smart Contract Overview](#9-smart-contract-overview)     | Jian Zhi                           |
+| 10  | [Folder Structure](#10-folder-structure)                  | `[Your name]`                      |
+| 11  | [Troubleshooting](#11-troubleshooting)                    | `TODO: unassigned, please confirm` |
+| 12  | [Future Improvements](#12-future-improvements)            | `[Your name]`                      |
 
 ## 7. System Features
 

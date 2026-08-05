@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "CryptoLend-Documentation/System Feature/SystemFeature.md",
+                "file": "README.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "SystemFeature"
+              "title": "README"
             }
           }
         ]
@@ -41,7 +41,9 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-folder-closed",
               "title": "Files"
@@ -184,8 +186,23 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "698798d1c38dc1bb",
+  "active": "29822b0301698e62",
   "lastOpenFiles": [
+    "CryptoLend-Documentation/Overview/Project_Overview.md",
+    "CryptoLend-Documentation/Overview/Technology_Stack.md",
+    "CryptoLend-Documentation/Overview/Introduction.md",
+    "CryptoLend-Documentation/Overview/Future_Improvements.md",
+    "CryptoLend-Documentation/Overview",
+    "Overview/Introduction.md",
+    "Overview/Introduction/md",
+    "Overview/Introduction",
+    "Overview/Future_Improvements.md",
+    "Overview/Technology_Stack.md",
+    "Overview",
+    "CryptoLend-Documentation/System Feature/SystemFeature.md",
+    "CryptoLend-Documentation/System Feature/images/Guide.md",
+    "CryptoLend-Documentation/System Feature/images/CreateAcc_Email.png",
+    "CryptoLend-Documentation/CryptoLend-System-Documentation.md",
     "README.md"
   ]
 }
