@@ -417,11 +417,20 @@ Flow:
 
 On confirmation, the contract's `depositCollateral()` is called with the ETH amount attached as `value`. This both credits the collateral and starts the clock on supply-interest accrual for that wallet. A receipt dialog confirms the deposit and the new collateral total.
 
-![Deposit tab showing amount entry, quick-fill buttons, and the "Max you can borrow" panel](images/7.7-deposit.png)
-*Figure 7.7.1: Deposit Collateral*
+![Deposit tab showing amount entry, quick-fill buttons, and the "Max you can borrow" panel](images/deposit.png)
+<center><u>Figure 7.7.1: Deposit Collateral</u></center>
 
 ```solidity
-// TODO: paste depositCollateral() from blockchain/contracts/CryptoLoan.sol
+//depositCollateral() from blockchain/contracts/CryptoLoan.sol
+    function depositCollateral() external payable whenNotPaused nonReentrant {
+        require(msg.value > 0, "Send ETH");
+        if (supplyStart[msg.sender] == 0) {
+            supplyStart[msg.sender] = block.timestamp;
+        }
+        loans[msg.sender].collateral += msg.value;
+        totalCollateral              += msg.value;
+        emit CollateralDeposited(msg.sender, msg.value);
+    }
 ```
 
 ---
