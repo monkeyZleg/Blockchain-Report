@@ -11,14 +11,10 @@
             "id": "698798d1c38dc1bb",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "README.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "README"
+              "title": "New tab"
             }
           }
         ]
@@ -186,23 +182,52 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "29822b0301698e62",
+  "active": "698798d1c38dc1bb",
   "lastOpenFiles": [
-    "CryptoLend-Documentation/Overview/Project_Overview.md",
-    "CryptoLend-Documentation/Overview/Technology_Stack.md",
-    "CryptoLend-Documentation/Overview/Introduction.md",
-    "CryptoLend-Documentation/Overview/Future_Improvements.md",
-    "CryptoLend-Documentation/Overview",
-    "Overview/Introduction.md",
-    "Overview/Introduction/md",
-    "Overview/Introduction",
-    "Overview/Future_Improvements.md",
-    "Overview/Technology_Stack.md",
-    "Overview",
-    "CryptoLend-Documentation/System Feature/SystemFeature.md",
+    "CryptoLend-Documentation/4 Future Improvement/Future Improvements.md",
+    "CryptoLend-Documentation/3 Smart Contract Intergration/Smart Contract Overview.md",
+    "CryptoLend-Documentation/3 Smart Contract Intergration/Smart Contract Deployment.md",
+    "CryptoLend-Documentation/3 Smart Contract Intergration/Database Design.md",
+    "CryptoLend-Documentation/2 System Feature/SystemFeature.md",
+    "CryptoLend-Documentation/1 Overview/Project_Overview.md",
+    "CryptoLend-Documentation/4 Future Improvement",
+    "CryptoLend-Documentation/3 Smart Contract Intergration",
+    "CryptoLend-Documentation/2 System Feature",
+    "CryptoLend-Documentation/1 Overview",
+    "CryptoLend-Documentation",
+    "asset/Withdrawal.png",
+    "asset/System_Architecture.png",
+    "asset/SignUpMM.png",
+    "asset/RepaySelection.png",
+    "asset/RepayResit.png",
+    "asset/RepayAmount.png",
+    "asset/MMUsername&Password.png",
+    "asset/MarketCalculator.png",
+    "asset/Market.png",
+    "asset/loginSelection.png",
+    "asset",
+    "CryptoLend-Documentation - Copy/4 Future Improvement/Future Improvements.md",
+    "CryptoLend-Documentation - Copy/4 Future Improvement",
+    "CryptoLend-Documentation - Copy/3 Smart Contract Intergration/Smart Contract Overview.md",
+    "CryptoLend-Documentation - Copy/3 Smart Contract Intergration/Smart Contract Deployment.md",
+    "CryptoLend-Documentation - Copy/3 Smart Contract Intergration/Database Design.md",
+    "CryptoLend-Documentation - Copy/2 System Feature/SystemFeature.md",
+    "CryptoLend-Documentation - Copy/1 Overview/Project_Overview.md",
+    "CryptoLend-Documentation - Copy/3 Smart Contract Intergration",
+    "CryptoLend-Documentation - Copy/2 System Feature",
+    "CryptoLend-Documentation - Copy/1 Overview",
     "CryptoLend-Documentation/System Feature/images/Guide.md",
-    "CryptoLend-Documentation/System Feature/images/CreateAcc_Email.png",
-    "CryptoLend-Documentation/CryptoLend-System-Documentation.md",
-    "README.md"
+    "CryptoLend-Documentation/System Feature/SystemFeature.md",
+    "CryptoLend-Documentation/Overview/Project_Overview.md",
+    "copy/CryptoLend-Documentation - Copy/4 Future Improvement/Future Improvements.md",
+    "copy/CryptoLend-Documentation - Copy/3 Smart Contract Intergration/Smart Contract Overview.md",
+    "copy/CryptoLend-Documentation - Copy/3 Smart Contract Intergration/Smart Contract Deployment.md",
+    "copy/CryptoLend-Documentation - Copy/3 Smart Contract Intergration/Database Design.md",
+    "copy/CryptoLend-Documentation - Copy/2 System Feature/SystemFeature.md",
+    "copy/CryptoLend-Documentation - Copy/1 Overview/Project_Overview.md",
+    "CryptoLend-Documentation/3 Smart Contract Intergration/JianZhi-Sections-6-8-9.md",
+    "CryptoLend-Documentation copy/System Feature/images/Guide.md",
+    "CryptoLend-Documentation copy/System Feature/SystemFeature.md",
+    "CryptoLend-Documentation copy/Overview/Project_Overview.md"
   ]
 }
