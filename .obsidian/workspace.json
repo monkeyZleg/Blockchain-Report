@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "README.md",
+                "file": "CryptoLend-Documentation/Overview/Project_Overview.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "README"
+              "title": "Project_Overview"
             }
           }
         ]
@@ -186,8 +186,9 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "29822b0301698e62",
+  "active": "698798d1c38dc1bb",
   "lastOpenFiles": [
+    "README.md",
     "CryptoLend-Documentation/Overview/Project_Overview.md",
     "CryptoLend-Documentation/Overview/Technology_Stack.md",
     "CryptoLend-Documentation/Overview/Introduction.md",
@@ -202,7 +203,6 @@
     "CryptoLend-Documentation/System Feature/SystemFeature.md",
     "CryptoLend-Documentation/System Feature/images/Guide.md",
     "CryptoLend-Documentation/System Feature/images/CreateAcc_Email.png",
-    "CryptoLend-Documentation/CryptoLend-System-Documentation.md",
-    "README.md"
+    "CryptoLend-Documentation/CryptoLend-System-Documentation.md"
   ]
 }
