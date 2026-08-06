@@ -497,14 +497,33 @@ Flow:
 
 On confirmation, `borrow(myrAmount)` mints MYR straight to the wallet, up to 70% of collateral value. An itemised ledger row is also saved off-chain (principal, locked APR, term) to power the instalment breakdown used in [Repay](#710-repay-loan).
 
-![Borrow tab showing amount entry and the rate/repayment breakdown](images/7.9-borrow.png)
-*Figure 7.9.1: Borrow MYR*
+![Borrow tab showing amount entry and the rate/repayment breakdown](images/borrow.png)
 
-![Borrow confirmation dialog summarising the loan before it is submitted](images/7.9-borrow-confirm.png)
-*Figure 7.9.2: Borrow confirmation*
+<center><u>Figure 7.9.1: Borrow MYR</u></center>
 
+![Borrow confirmation dialog summarising the loan before it is submitted|682](images/BorrowConfirmation.png)
+![](images/BorrowResit.png)
+<center><u>Figure 7.9.2: Borrow confirmation and Feedback</u></center>
 ```solidity
-// TODO: paste borrow() from blockchain/contracts/CryptoLoan.sol
+//borrow() from blockchain/contracts/CryptoLoan.sol
+    function borrow(uint256 myrAmount) external whenNotPaused nonReentrant onlyKYC {
+        require(myrAmount > 0, "Amount must be > 0");
+        Loan storage loan = loans[msg.sender];
+        require(loan.collateral > 0, "Deposit collateral first");
+
+        uint256 maxBorrow = _maxBorrow(loan.collateral);
+        require(loan.principal + myrAmount <= maxBorrow, "Exceeds max LTV");
+
+        if (loan.startTime == 0) {
+            loan.startTime    = block.timestamp;
+            loan.lastRepayTime = block.timestamp;
+        }
+        loan.principal += myrAmount;
+        totalBorrowed  += myrAmount;
+
+        myr.mint(msg.sender, myrAmount);
+        emit Borrowed(msg.sender, myrAmount, loan.principal);
+    }
 ```
 
 ---
@@ -524,11 +543,46 @@ Flow:
 
 On confirmation this is a two-step transaction: the user first `approve()`s the contract to pull the MYR, then `repay(myrAmount)` executes. Interest is always settled before principal. A full payoff **does not automatically return collateral**. It stays deposited so it can back a new loan immediately, and is only returned via a separate [Withdraw](#78-withdraw-collateral). The confirmed on-chain amounts are then reconciled back into the off-chain instalment ledger.
 
-![Repay tab showing selectable borrow rows, "This Month's Bill", and the MYR top-up-then-repay flow](images/7.10-repay.png)
-*Figure 7.10.1: Repay Loan*
 
+![Repay tab showing selectable borrow rows, "This Month's Bill", and the MYR top-up-then-repay flow](images/repaySelection.png)
+
+<center><u>Figure 7.10.1: Repay Loan Selection</u></center>
+![](images/RepayAmount.png)
+<center><u>Figure 7.10.2: Repay Loan with Specific Amount (Month)</u></center>
+
+![](images/RepayResit.png)
+<center><u>Figure 7.10.3: Repay Loan Result</u></center>
 ```solidity
-// TODO: paste repay() from blockchain/contracts/CryptoLoan.sol
+// repay() from blockchain/contracts/CryptoLoan.sol
+
+    function repay(uint256 myrAmount) external whenNotPaused nonReentrant {
+        Loan storage loan = loans[msg.sender];
+        require(loan.principal > 0, "No active loan");
+        require(myrAmount > 0, "Amount must be > 0");
+
+        uint256 interest = accruedInterest(msg.sender);
+        uint256 due      = loan.principal + interest;
+        uint256 paying   = myrAmount > due ? due : myrAmount;
+
+        myr.transferFrom(msg.sender, address(this), paying);
+
+        uint256 interestPaid   = paying >= interest ? interest : paying;
+        uint256 principalPaid  = paying > interest ? paying - interest : 0;
+
+        protocolFees   += interestPaid;
+        totalBorrowed  -= principalPaid;
+
+        if (principalPaid >= loan.principal) {
+            loan.principal     = 0;
+            loan.startTime     = 0;
+            loan.lastRepayTime = 0;
+        } else {
+            loan.principal    -= principalPaid;
+            loan.lastRepayTime = block.timestamp;
+        }
+
+        emit Repaid(msg.sender, principalPaid, interestPaid);
+    }
 ```
 
 ---
@@ -544,11 +598,29 @@ Flow:
 
 On confirmation, `buyMYR(myrAmount)` is called with slightly more ETH attached than strictly required (a small rounding buffer). The contract mints the requested MYR and **automatically refunds any excess ETH** in the same transaction. This is most commonly used from inside the Repay flow, to top up a shortfall before repaying.
 
-![Buy MYR tab showing amount entry and the live ETH cost breakdown](images/7.11-buy-myr.png)
-*Figure 7.11.1: Buy MYR*
+![Buy MYR tab showing amount entry and the live ETH cost breakdown](images/buymyr.png)
+
+<center><u>Figure 7.11.1: Buy MYR</u></center>
 
 ```solidity
-// TODO: paste buyMYR() from blockchain/contracts/CryptoLoan.sol
+// buyMYR() from blockchain/contracts/CryptoLoan.sol
+
+    function buyMYR(uint256 myrAmount) external payable whenNotPaused nonReentrant {
+        require(myrAmount > 0, "Amount must be > 0");
+        require(ethPrice > 0, "Price not set");
+        // ETH needed = (myrAmount / ethPrice) in wei.
+        // myrAmount is in MYR_DECIMALS (1e6) units; ethPrice is whole MYR per ETH.
+        uint256 ethNeeded = (myrAmount * 1e18) / (ethPrice * MYR_DECIMALS);
+        require(msg.value >= ethNeeded, "Insufficient ETH");
+        myr.mint(msg.sender, myrAmount);
+        // Refund any excess ETH sent
+        uint256 excess = msg.value - ethNeeded;
+        if (excess > 0) {
+            payable(msg.sender).transfer(excess);
+        }
+        emit MYRPurchased(msg.sender, ethNeeded, myrAmount);
+    }
+    
 ```
 
 ---
@@ -597,14 +669,159 @@ A 5-step wizard:
 
 Submitting creates a `pending` record and shows a reference number (`KYC-######`). Returning to the page while pending shows a status screen instead of the form. A rejected submission reopens the wizard pre-filled, with the previous rejection called out, ready to correct and resubmit. There is no automated document verification. Every submission is reviewed by a human admin (see [7.12](#712-admin-panel)). Approval is what ultimately allows the account to deposit, borrow, or buy MYR once a wallet is linked.
 
-![KYC wizard showing the Document Upload step with both ID sides attached](images/7.13-kyc-wizard.png)
-*Figure 7.13.1: KYC submission wizard*
+![KYC wizard showing the Document Upload step with both ID sides attached](images/KYC_Document.png)
 
-![KYC "Under Review" status screen with the reference number](images/7.13-kyc-status.png)
-*Figure 7.13.2: KYC status screen*
+<center><u>Figure 7.13.1: KYC submission wizard</u></center>
+
+![KYC "Under Review" status screen with the reference number|697](images/kyc_pending.png)
+<center><u>Figure 7.13.2: KYC status screen</u></center>
+
+![](images/KYC_Approval.png)
+<center><u>Figure 7.13.3: Admin KYC Approval</u></center>
 
 ```ts
-// TODO: paste the POST handler from web/src/app/api/kyc/route.ts
+//POST handler from web/src/app/api/kyc/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db/prisma';
+import { getSessionUser, requireActiveUser, requireAdmin, audit } from '@/lib/authz';
+import { featureBlocked } from '@/lib/features-server';
+
+function cleanDataUri(dataUri: string | undefined): string | undefined {
+
+  return typeof dataUri === 'string' && dataUri.startsWith('data:') ? dataUri : undefined;
+
+}
+
+// POST /api/kyc — save KYC form data + document uploads
+
+export async function POST(req: NextRequest) {
+  const guard = await requireActiveUser();
+  if (!guard.ok) return guard.response;
+
+  const blocked = await featureBlocked('page.kyc', { isAdmin: guard.user.isAdmin });
+
+  if (blocked) return blocked;
+  try {
+    const body = await req.json();
+    const {
+      fullName, docType, icNumber, dob, gender, nationality,
+      phone, email, addr1, addr2, postcode, city, state,
+      employment, income, purpose, fundSource,
+      icFront, icBack, selfie,
+    } = body;
+
+    const dt = docType === 'passport' || docType === 'license' ? docType : 'ic';
+
+    if (!fullName || !icNumber || !dob || !gender || !phone || !email ||
+        !addr1 || !postcode || !city || !state || !employment || !income || !purpose || !fundSource) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Store document images in-DB (Supabase Postgres) as data URIs so they are
+    // shared across all users, not saved to the local filesystem.
+
+    const icFrontData = cleanDataUri(icFront);
+    const icBackData  = cleanDataUri(icBack);
+    const selfieData  = cleanDataUri(selfie);
+
+    // No wallet is required to submit. If the account already linked one, the
+    // submission is anchored to it; otherwise the anchor is set later, when
+    // POST /api/wallet/link runs (signature-proved ownership).
+
+    const walletKey = guard.user.walletAddress?.toLowerCase() ?? null;
+    const record = await prisma.kycSubmission.upsert({
+      where:  { userId: guard.user.id },
+      update: {
+        wallet: walletKey,
+        fullName, docType: dt, icNumber, dob, gender, nationality, phone, email,
+        addr1, addr2: addr2 ?? '', postcode, city, state,
+        employment, income, purpose, fundSource,
+        ...(icFrontData && { icFrontData }),
+        ...(icBackData  && { icBackData }),
+        ...(selfieData  && { selfieData }),
+        status: 'pending',
+      },
+
+      create: {
+        userId: guard.user.id,
+        wallet: walletKey,
+        fullName, docType: dt, icNumber, dob, gender, nationality, phone, email,
+        addr1, addr2: addr2 ?? '', postcode, city, state,
+        employment, income, purpose, fundSource,
+        icFrontData, icBackData, selfieData,
+        status: 'pending',
+      },
+    });
+    return NextResponse.json({ success: true, id: record.id, status: record.status });
+  } catch (err) {
+    console.error('[POST /api/kyc]', err);
+    return NextResponse.json({
+      error: 'Could not save your KYC application right now. Please try again in a moment — if it keeps failing, contact support.',
+    }, { status: 500 });
+  }
+}
+
+  
+
+// GET /api/kyc — the signed-in account's own KYC status (excludes heavy image
+// blobs; use GET /api/kyc/documents to fetch images).
+
+export async function GET() {
+  try {
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const record = await prisma.kycSubmission.findUnique({
+      where: { userId: user.id },
+    });
+
+    if (!record) return NextResponse.json({ exists: false }, { status: 200 });
+    // Strip the heavy image blobs from the status response — images are fetched
+    // separately via GET /api/kyc/documents.
+
+    const rest = { ...record };
+    delete (rest as Partial<typeof record>).icFrontData;
+    delete (rest as Partial<typeof record>).icBackData;
+    delete (rest as Partial<typeof record>).selfieData;
+    return NextResponse.json({ exists: true, ...rest });
+  } catch (err) {
+    console.error('[GET /api/kyc]', err);
+    return NextResponse.json({ error: 'Could not load your KYC status. Please refresh the page.' }, { status: 500 });
+  }
+}
+
+  
+
+// DELETE /api/kyc?userId=... — remove a KYC submission (admin action).
+// A wallet param is still accepted as a fallback for wallet-anchored rows.
+
+export async function DELETE(req: NextRequest) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
+  const userId = req.nextUrl.searchParams.get('userId');
+  const wallet = req.nextUrl.searchParams.get('wallet');
+  if (!userId && !wallet) return NextResponse.json({ error: 'userId or wallet param required' }, { status: 400 });
+
+  
+
+  try {
+    const record = userId
+      ? await prisma.kycSubmission.findUnique({ where: { userId }, select: { id: true, userId: true } })
+      : await prisma.kycSubmission.findFirst({ where: { wallet: wallet!.toLowerCase() }, select: { id: true, userId: true } });
+    if (!record) return NextResponse.json({ error: 'No KYC submission found' }, { status: 404 });
+    await prisma.kycSubmission.delete({ where: { id: record.id } });
+
+    // Off-chain deletion only. If a wallet was already approved on-chain the
+    // contract's KYC flag stays set — the admin surface never revokes on chain.
+
+    await audit(guard.user, 'KYC_DELETE', 'kyc', record.userId);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('[DELETE /api/kyc]', err);
+    return NextResponse.json({ error: 'Could not delete the KYC submission. Please try again.' }, { status: 500 });
+  }
+}
 ```
 
 ---
