@@ -11,10 +11,14 @@ The code is organized into two repositories: repository: `blockchain/` (Solidity
 ![](asset/System_Architecture.png)
 
 - **On-chain is the source of truth for money**: collateral, debt, interest, liquidation, the ETH/MYR price, and a per-wallet `kycApproved` flag all live in the `CryptoLoan.sol` smart contract.
-- **Off-chain (Supabse) is the source of truth for identity**: user accounts, KYC submissions and documents, feature flags, and the admin audit log. It never holds money or payout instructions — loan disbursement is the on-chain MYR transfer, nothing more.
+- **Off-chain (Supabse) is the source of truth for identity**: user accounts, KYC submissions and documents, feature flags, and the admin audit log. It never holds money or payout instructions loan disbursement is the on-chain MYR transfer, nothing more.
 - **The web app bridges the two**: users sign their own transactions with
   MetaMask; the server (holding the contract owner key) performs
   owner-only calls such as `setKYC` and price updates.
+
+
+The complete system overview for the main features is illustrated in the following diagram: 
+![533](asset/MainFeatureDiagram.png)
 
 ### 2.1 Smart Contracts
 

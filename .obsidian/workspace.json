@@ -11,10 +11,14 @@
             "id": "698798d1c38dc1bb",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "CryptoLend-Documentation/3 Smart Contract Intergration/Database Design.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "Database Design"
             }
           }
         ]
@@ -184,12 +188,13 @@
   },
   "active": "698798d1c38dc1bb",
   "lastOpenFiles": [
-    "CryptoLend-Documentation/4 Future Improvement/Future Improvements.md",
+    "CryptoLend-Documentation/1 Overview/Project_Overview.md",
+    "asset/MainFeatureDiagram.png",
+    "CryptoLend-Documentation/2 System Feature/SystemFeature.md",
     "CryptoLend-Documentation/3 Smart Contract Intergration/Smart Contract Overview.md",
     "CryptoLend-Documentation/3 Smart Contract Intergration/Smart Contract Deployment.md",
     "CryptoLend-Documentation/3 Smart Contract Intergration/Database Design.md",
-    "CryptoLend-Documentation/2 System Feature/SystemFeature.md",
-    "CryptoLend-Documentation/1 Overview/Project_Overview.md",
+    "CryptoLend-Documentation/4 Future Improvement/Future Improvements.md",
     "CryptoLend-Documentation/4 Future Improvement",
     "CryptoLend-Documentation/3 Smart Contract Intergration",
     "CryptoLend-Documentation/2 System Feature",
@@ -204,7 +209,6 @@
     "asset/MMUsername&Password.png",
     "asset/MarketCalculator.png",
     "asset/Market.png",
-    "asset/loginSelection.png",
     "asset",
     "CryptoLend-Documentation - Copy/4 Future Improvement/Future Improvements.md",
     "CryptoLend-Documentation - Copy/4 Future Improvement",
