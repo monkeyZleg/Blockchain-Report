@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "CryptoLend-Documentation/2 System Feature/7.0 System Feature.md",
+                "file": "CryptoLend-Documentation/4 Future Improvement/Future Improvements.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "7.0 System Feature"
+              "title": "Future Improvements"
             }
           }
         ]
@@ -41,7 +41,9 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-folder-closed",
               "title": "Files"
@@ -186,11 +188,14 @@
   },
   "active": "698798d1c38dc1bb",
   "lastOpenFiles": [
+    "CryptoLend-Documentation/3 Smart Contract Intergration/Smart Contract Overview.md",
+    "CryptoLend-Documentation/3 Smart Contract Intergration/Smart Contract Deployment.md",
+    "CryptoLend-Documentation/3 Smart Contract Intergration/Database Design.md",
+    "CryptoLend-Documentation/2 System Feature/7.0 System Feature.md",
     "CryptoLend-Documentation/2 System Feature/7.9 KYC Verification.md",
     "CryptoLend-Documentation/2 System Feature/7.8 Admin Panel.md",
     "CryptoLend-Documentation/2 System Feature/7.10 Settings.md",
     "CryptoLend-Documentation/2 System Feature/7.7.5 Buy MYR.md",
-    "CryptoLend-Documentation/2 System Feature/7.0 System Feature.md",
     "CryptoLend-Documentation/2 System Feature/7.3 Dashboard.md",
     "CryptoLend-Documentation/2 System Feature/7.2 User Login.md",
     "CryptoLend-Documentation/2 System Feature/7.1 User Registration (Sign Up).md",
@@ -206,10 +211,7 @@
     "CryptoLend-Documentation/2 System Feature/7.5 Portfolio.md",
     "CryptoLend-Documentation/2 System Feature/7.5 Portfolio",
     "CryptoLend-Documentation/2 System Feature/Untitled",
-    "CryptoLend-Documentation/3 Smart Contract Intergration/Database Design.md",
     "JianZhi-Sections-6-8-9.md",
-    "CryptoLend-Documentation/3 Smart Contract Intergration/Smart Contract Overview.md",
-    "CryptoLend-Documentation/3 Smart Contract Intergration/Smart Contract Deployment.md",
     "CryptoLend-Documentation/System Feature/SystemFeature.md",
     "asset/Withdrawal.png",
     "asset/System_Architecture.png",

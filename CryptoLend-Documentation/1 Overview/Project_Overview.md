@@ -16,6 +16,12 @@ The code is organized into two repositories: repository: `blockchain/` (Solidity
   MetaMask; the server (holding the contract owner key) performs
   owner-only calls such as `setKYC` and price updates.
 
+
+## System Diagram
+The complete system overview for the main features is illustrated in the following diagram:
+
+![](asset/MainFeatureDiagram.png)
+
 ### 2.1 Smart Contracts
 
 `CryptoLoan.sol` is the core protocol — **70% max LTV**, **80% liquidation threshold**, **5% liquidator bonus**, and a variable APR (3% base + up to 4% utilization premium + up to 3% volatility premium, accrued linearly).

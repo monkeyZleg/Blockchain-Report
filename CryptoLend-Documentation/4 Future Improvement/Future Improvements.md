@@ -1,6 +1,4 @@
 
-## 7. Future Improvements
-
 - **Improve database architecture and environment management** 
 	- Optimize database normalization, indexing strategies, and query performance while implementing separate database environments inculde **Testing** and **UAT** through environment configuration. This ensures isolated testing, safer user acceptance validation, improved deployment reliability, and prevents test data from affecting production-like environments.
 - **Improve API architecture**
