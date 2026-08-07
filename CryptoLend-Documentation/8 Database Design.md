@@ -19,10 +19,10 @@ The database is deliberately **not** the source of truth for money. That role be
 
 Six models, defined in [`web/prisma/schema.prisma`](../../../web/prisma/schema.prisma):
 
-- **`User`**, the account: `email`+`password` and/or a linked `walletAddress`, `isAdmin`, `status` (`ACTIVE`/`RESTRICTED`), `sessionEpoch` (JWT invalidation).
+- **`User`**, the account: `email`+`password` and/or a linked `walletAddress`, `isAdmin`, `status` (`ACTIVE`/`RESTRICTED`/`SUSPENDED`), `sessionEpoch` (JWT invalidation).
 - **`KycSubmission`**, one per user (not per wallet): personal/address/financial fields, ID document images, `status` (`pending`/`approved`/`rejected`).
 - **`LoanTransaction`**, a mirrored copy of on-chain protocol events, keyed by wallet + unique `txHash`.
-- **`BorrowPosition`**, the itemised per-borrow tranche ledger that powers the Repay tab's installment breakdown.
+- **`BorrowPosition`**, the per-loan ledger row that annotates each on-chain loan (keyed by its `loanId`) with the installment-plan metadata the contract doesn't store.
 - **`FeatureFlag`**, admin overrides (`ON`/`MAINTENANCE`/`HIDDEN`) on top of the `lib/features.ts` registry.
 - **`AdminAuditLog`**, append-only record of every admin mutation.
 
@@ -89,9 +89,12 @@ erDiagram
     BorrowPosition {
         String id PK
         String wallet "indexed, no FK"
+        Int loanId "on-chain loan index, nullable"
+        DateTime dueDate "denormalized from chain"
         String principal
         String originalPrincipal
         Int aprBps
+        Int baseAprBps
         Int termMonths
         String txHash UK
         DateTime borrowedAt
@@ -149,7 +152,17 @@ model User {
 }
 ```
 
-Either `email`+`password`, `walletAddress`, or both, may be set (never `walletAddress`-only *and* email-only-without-a-password; see the Settings invariant in Section 7.14). `status` is `"ACTIVE"` or `"RESTRICTED"`; a restricted account can still sign in and read but every write is refused off-chain. This cannot stop the wallet from calling the contract directly. `sessionEpoch` is bumped on password reset to invalidate every JWT already issued to that user, since sessions are stateless cookies rather than server-tracked.
+Either `email`+`password`, `walletAddress`, or both, may be set (never `walletAddress`-only *and* email-only-without-a-password; see the Settings invariant in Section 7.14). `sessionEpoch` is bumped to invalidate every JWT already issued to that user, since sessions are stateless cookies rather than server-tracked.
+
+`status` has three values, and the difference between the last two matters:
+
+| `status`     | Effect                                                                                                                       |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `ACTIVE`     | Normal account                                                                                                               |
+| `RESTRICTED` | May still sign in and read, but every write is refused                                                                       |
+| `SUSPENDED`  | Refused at sign-in entirely: `getSessionUser()` treats the session as absent, and suspending bumps `sessionEpoch` to kill any token already live |
+
+All three are **off-chain only**. As the schema's own comment states, a user in any of these states can still call the contract directly from their own wallet; `lib/authz.ts` carries the full caveat. Restricting an account stops CryptoLend's app from acting for them, not the blockchain from accepting their signature.
 
 The live `User` table in Supabase's Table Editor:
 
@@ -215,28 +228,46 @@ The live `LoanTransaction` table in Supabase's Table Editor:
 
 ![DatabaseTable_LoanTransaction](DatabaseTable_LoanTransaction.png)
 
-**`BorrowPosition`**, the itemised **tranche ledger** on top of the contract's aggregate position:
+**`BorrowPosition`**, one row per on-chain loan, carrying the plan metadata the contract doesn't store:
 
 ```prisma
 model BorrowPosition {
   id           String    @id @default(cuid())
   wallet       String
+  /// On-chain loan index for this wallet (CryptoLoan._userLoans[wallet][loanId]).
+  loanId       Int?
+  /// This loan's on-chain due date (startTime + term), denormalized at borrow time.
+  dueDate      DateTime?
   principal    String
   originalPrincipal String @default("0")
   aprBps       Int
+  /// Base rate at the same moment; display only, for the "base + premium" split.
+  baseAprBps   Int       @default(0)
   termMonths   Int       @default(1)
   txHash       String    @unique
   borrowedAt   DateTime  @default(now())
-  status       String    @default("OPEN") // OPEN | REPAID
+  status       String    @default("OPEN") // OPEN | REPAID | LIQUIDATED
   repaidAt     DateTime?
   repayTxHash  String?
   interestPaid String?
 
   @@index([wallet, status])
+  @@index([wallet, loanId])
 }
 ```
 
-On-chain, `CryptoLoan.loans[wallet]` collapses *all* of a wallet's borrows into a single `principal`/`startTime` pair; the Repay tab (Section 7.10), however, needs to list and settle each borrow separately, "Month M of N", at the APR that was locked in *when that borrow happened*. So each `borrow()` call writes one row here, capturing `aprBps` and `termMonths` as frozen values. `principal` shrinks as repayments settle against the row; `originalPrincipal` never changes, and the difference between the two is what lets an early payoff still correctly compute "how many of the N installments are done" instead of just dividing by elapsed calendar time. The chain remains authoritative for the wallet's real total debt. This table is purely the itemisation layer for the UI.
+This table's role changed when the contract moved to per-loan state. The chain now keeps a real `Loan[]` array per wallet (§9.3), so principal, APR, due date and interest are all authoritative on-chain. This row no longer *reconstructs* itemisation the contract lacks, it **annotates** an existing on-chain loan.
+
+`loanId` is the join key: it's read out of the `LoanCreated` event right after the borrow confirms, and it's what lets a repayment settle exactly the rows its per-loan `Repaid(loanId, …)` events covered (§9.5.3). It is nullable only for rows written before the per-loan contract existed.
+
+What genuinely lives only here:
+
+| Field               | Why the chain doesn't have it                                                                                                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `termMonths`        | The 1/3/6/12 installment plan. The contract stores `termDays` (30/90/180/365) and a `dueDate`, but has no concept of monthly instalments; that is a UI construct                                |
+| `originalPrincipal` | Frozen at creation while `principal` shrinks as payments settle. The difference between the two is what lets an early payoff advance "Month M of N" correctly, instead of dividing by elapsed calendar time and showing a plan as behind when it is actually paid ahead |
+| `baseAprBps`        | The base rate at borrow time, so the Repay tab can show "3.00% base + 0.36% utilisation" rather than just the blended figure. Display only; `aprBps` is what interest is priced off everywhere. It defaults to `0`, meaning "unknown", and the UI falls back to an APR-only display for those rows |
+| `dueDate`           | Denormalised for admin/reporting queries. The dashboard reads the live value from the chain, never from here                                                                                    |
 
 The live `BorrowPosition` table in Supabase's Table Editor:
 
