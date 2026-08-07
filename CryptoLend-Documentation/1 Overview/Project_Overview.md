@@ -16,7 +16,7 @@ The code is organized into two repositories: repository: `blockchain/` (Solidity
   MetaMask; the server (holding the contract owner key) performs
   owner-only calls such as `setKYC` and price updates.
 
-
+## Diagram
 The complete system overview for the main features is illustrated in the following diagram: 
 ![533](asset/MainFeatureDiagram.png)
 
