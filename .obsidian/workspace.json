@@ -186,8 +186,9 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "698798d1c38dc1bb",
+  "active": "29822b0301698e62",
   "lastOpenFiles": [
+    "CryptoLend-Documentation/2 System Feature/SystemFeature.md",
     "CryptoLend-Documentation/3 Smart Contract Intergration/Smart Contract Overview.md",
     "CryptoLend-Documentation/3 Smart Contract Intergration/Smart Contract Deployment.md",
     "CryptoLend-Documentation/3 Smart Contract Intergration/Database Design.md",
@@ -232,7 +233,6 @@
     "CryptoLend-Documentation/1 Overview",
     "CryptoLend-Documentation/CryptoLend-System-Documentation.md",
     "CryptoLend-Documentation/FEATURES_AND_SETUP.md",
-    "images/SignUpMM.md",
     "images"
   ]
 }
