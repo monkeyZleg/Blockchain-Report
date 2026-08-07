@@ -1,7 +1,7 @@
 
 ## 9. Smart Contract Overview
 
-This section walks [`CryptoLoan.sol`](../../../blockchain/contracts/CryptoLoan.sol) end to end: its architecture, risk parameters, and every function, each core action paired with the real **frontend bridge** code that calls it from [`web/src/lib/WalletContext.tsx`](../../../web/src/lib/WalletContext.tsx), the same pairing Section 7 in the full document already walked from the UI's point of view. It closes with the supporting token contracts.
+This section walks `CryptoLoan.sol` end to end: its architecture, risk parameters, and every function, each core action paired with the real **frontend bridge** code that calls it from `web/src/lib/WalletContext.tsx`, the same pairing Section 7 in the full document already walked from the UI's point of view. It closes with the supporting token contracts.
 
 ### Table of contents, Section 9
 
@@ -31,8 +31,8 @@ contract CryptoLoan is ReentrancyGuard, Pausable, Ownable2Step {
 | Inherited from    | Gives the contract                                                                                                                                                          |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ReentrancyGuard` | `nonReentrant` on every state-changing function that moves ETH or MYR                                                                                                       |
-| `Pausable`        | `whenNotPaused` guards + owner-only `pause()`/`unpause()`, an emergency stop                                                                                                |
-| `Ownable2Step`    | Owner-gated admin functions, with a two-step ownership transfer (safer than one-shot `Ownable`, since a typo'd `transferOwnership` address can't permanently brick control) |
+| `Pausable`        | `whenNotPaused` guards + admin-only `pause()`/`unpause()`, an emergency stop                                                                                                |
+| `Ownable2Step`    | The admin role, plus a two-step transfer of it (safer than one-shot `Ownable`, since a typo'd `transferOwnership` address can't permanently brick control) |
 
 **The central design decision is that each borrow is its own loan.** The contract's own header states it directly:
 
@@ -43,13 +43,13 @@ That split runs through the whole contract, and it's what makes "repay plan #2" 
 | Concern                                    | Scope                                                            |
 | ------------------------------------------ | ---------------------------------------------------------------- |
 | Collateral (`collateralOf`)                | **One shared pot** per borrower                                  |
-| LTV, health factor, borrow limit           | Against the **sum** of active principals                         |
+| LTV, health factor, borrow limit           | Against the sum of active principals                         |
 | Principal, APR, start/due date, interest   | **Per loan** (`_userLoans[borrower][loanId]`)                    |
 | Repayment                                  | **Per loan**, addressed by `loanId`                              |
 
 Loans are also **fixed-term** (30/90/180/365 days). Past the due date a 7-day grace period runs; after that the loan is liquidatable even if the collateral itself is perfectly healthy (§9.8).
 
-Its constructor deploys its **own** `MockMYR` token instance (`myr = new MockMYR()`), so the loan contract is the token's `minter` by construction, with no separate wiring step and no way to end up with a `CryptoLoan` pointed at the wrong MYR token (see [6.5](#65-what-deployts-actually-does) for how this shapes the deploy script's fresh-node requirement).
+Its constructor deploys its own `MockMYR` token instance (`myr = new MockMYR()`), so the loan contract is the token's `minter` by construction, with no separate wiring step and no way to end up with a `CryptoLoan` pointed at the wrong MYR token (see [6.5](#65-what-deployts-actually-does) for how this shapes the deploy script's fresh-node requirement).
 
 On the frontend, every call into the contract goes through one factory in `WalletContext.tsx`, which picks a read-only provider or a MetaMask-signed runner depending on whether the call changes state:
 
@@ -93,10 +93,10 @@ uint256 public constant MYR_TZ_OFFSET    = 8 hours;
 | `MYR_DECIMALS`     | `1e6`                  | MYR token precision (matches `MockMYR.decimals()`)                                                                           |
 | `MAX_PRICE_CHANGE` | 20%                    | Max allowed move per `setEthPrice()` call (a circuit breaker against a fat-fingered or manipulated oracle update)            |
 | `GRACE_PERIOD`     | 7 days                 | Extra repayment time after a loan's due date before *overdue* liquidation becomes possible. Not a free extension: interest keeps accruing through it, it is only a shield against being liquidated the second the term ends |
-| `ACCRUAL_STEP`     | 1 day                  | Interest ticks once per calendar day, so the figure the UI quotes is exactly the figure the contract charges (§9.7)          |
+| `ACCRUAL_STEP`     | 1 day                  | Interest ticks once per calendar day, so the figure the UI quotes matches the figure the contract charges (§9.7)          |
 | `MYR_TZ_OFFSET`    | 8 hours                | Day boundaries land on **Malaysia midnight (UTC+8)**, not UTC midnight. This is an MYR product, so "today" means local time  |
 
-**The rate model.** Unlike the earlier flat-rate version of this contract, the utilization premium is now genuinely applied:
+**The rate model.** The borrow rate is a base rate plus a premium that rises with pool utilization:
 
 ```solidity
 uint256 public baseRateBps               = 300;   // owner-adjustable market rate (initial 3.0%)
@@ -107,9 +107,9 @@ uint256 public constant MAX_BASE_RATE_BPS = 1500; // hard cap: 15%
 uint256 public supplyCap = 100_000_000 * MYR_DECIMALS;  // RM 100,000,000
 ```
 
-`supplyCap` is what makes "the pool" a real quantity at all. MYR is minted on demand, so without a ceiling there would be nothing for utilisation to be a fraction *of*. It is the denominator of `utilizationBps()`, which drives the rate premium, and the limit `borrow()` refuses to exceed. It is owner-settable (§9.6), which is why it can't be `constant` or `immutable`.
+`supplyCap` gives "the pool" a real size. MYR is minted on demand, so without a ceiling there would be nothing for utilisation to be a fraction *of*. It is the denominator of `utilizationBps()`, which drives the rate premium, and the limit `borrow()` refuses to exceed. It is admin-settable (§9.6), which is why it can't be `constant` or `immutable`.
 
-`VOL_SLOPE_BPS` remains defined but deliberately unapplied. The contract's comment gives the reason plainly: it would move the rate on a price update, which a borrower can neither observe before it happens nor mirror from a single view call. Worth stating in the write-up as a deliberate omission rather than dead code.
+`VOL_SLOPE_BPS` is defined but never applied. The contract's comment gives the reason: it would move the rate on a price update, which a borrower can neither see coming nor reproduce from a single view call. It is an unused constant kept for reference, not dead code left by accident.
 
 ### 9.3 State Variables
 
@@ -121,9 +121,9 @@ uint256 public supplyCap = 100_000_000 * MYR_DECIMALS;  // RM 100,000,000
 | `protocolFees`    | `uint256`                    | Accumulated interest revenue (MYR units), payable out via `withdrawProtocolFees()`               |
 | `totalBorrowed`   | `uint256`                    | Protocol-wide outstanding debt (MYR units); numerator of `utilizationBps()`                      |
 | `totalCollateral` | `uint256`                    | Protocol-wide collateral (wei)                                                                   |
-| `supplyCap`       | `uint256`                    | Lending-pool ceiling (MYR units), owner-settable                                                 |
-| `baseRateBps`     | `uint256`                    | Owner-adjustable market base rate, before the utilisation premium                                |
-| `kycApproved`     | `mapping(address ⇒ bool)`    | Per-wallet gate for `borrow()`, set only by the owner via `setKYC()` (§9.6)                      |
+| `supplyCap`       | `uint256`                    | Lending-pool ceiling (MYR units), admin-settable                                                 |
+| `baseRateBps`     | `uint256`                    | Admin-adjustable market base rate, before the utilisation premium                                |
+| `kycApproved`     | `mapping(address ⇒ bool)`    | Per-wallet gate for `borrow()`, set only by the admin via `setKYC()` (§9.6)                      |
 | `liquidators`     | `mapping(address ⇒ bool)`    | Whitelisted addresses allowed to call `liquidate()`                                              |
 | `supplyStart`     | `mapping(address ⇒ uint256)` | Timestamp a depositor's supply-interest accrual clock started; `0` means "not currently earning" |
 | `collateralOf`    | `mapping(address ⇒ uint256)` | **The shared collateral pot** (wei) backing all of that borrower's loans together                |
@@ -142,7 +142,7 @@ struct Loan {
 }
 ```
 
-Two details of this struct are worth calling out, because they're easy to misread:
+Two details of this struct are easy to misread:
 
 - **`loanId` is the array index, and it is stable for the life of the account.** Repaid and liquidated loans are flagged `active = false` and left in place (never spliced out), so an id can never silently come to mean a different loan. This is what the `BorrowPosition.loanId` join key in [8.4](#84-table-by-table-walkthrough) depends on.
 - **`baseBps` is presentation-only.** It records what `baseRateBps` was at the same moment `aprBps` was locked, purely so the UI can show `aprBps − baseBps` as the utilisation premium. Interest math never reads it; `aprBps` is the rate that is actually charged.
@@ -153,12 +153,12 @@ Two details of this struct are worth calling out, because they're easy to misrea
 | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------- |
 | `CollateralDeposited(user, amount)`                                                      | `depositCollateral()`                                          | wei deposited                                                  |
 | `Borrowed(user, myrAmount, newTotal)`                                                    | `borrow()`                                                     | MYR minted, borrower's new total active principal              |
-| `LoanCreated(borrower, loanId, principal, dueDate, termDays, aprBps, baseBps)`           | `borrow()`                                                     | The full birth certificate of the new loan, including the **locked** rates |
+| `LoanCreated(borrower, loanId, principal, dueDate, termDays, aprBps, baseBps)`           | `borrow()`                                                     | The full birth certificate of the new loan, including the locked rates |
 | `Repaid(user, loanId, principal, interest)`                                              | `repay()` / `repayMany()`                                      | Which loan was paid, and the principal/interest split          |
 | `LoanClosed(user, loanId)`                                                               | `_repayOne()`, `liquidate()`                                   | Loan reached zero principal and went inactive                  |
 | `CollateralWithdrawn(user, amount)`                                                      | `withdrawCollateral()`                                         | wei returned                                                   |
 | `Liquidated(user, liquidator, debtCovered, collateralSeized)`                            | `liquidate()`                                                  | Liquidation outcome in aggregate                               |
-| `LoanLiquidated(borrower, loanId, collateralAmount, reason)`                             | `liquidate()`                                                  | Which loan, and **why** (`"collateral unsafe"` / `"loan overdue"`) |
+| `LoanLiquidated(borrower, loanId, collateralAmount, reason)`                             | `liquidate()`                                                  | Which loan, and why (`"collateral unsafe"` / `"loan overdue"`) |
 | `PriceUpdated(oldPrice, newPrice, updatedBy)`                                            | `setEthPrice()`                                                | oracle update, with who pushed it                              |
 | `BaseRateUpdated(oldRateBps, newRateBps)`                                                | `setBaseRate()`                                                | market-rate change                                             |
 | `SupplyCapUpdated(oldCap, newCap)`                                                       | `setSupplyCap()`                                               | pool resize                                                    |
@@ -168,7 +168,7 @@ Two details of this struct are worth calling out, because they're easy to misrea
 | `MYRPurchased(buyer, ethSpent, myrReceived)`                                             | `buyMYR()`                                                     | ETH→MYR swap                                                   |
 | `SupplyInterestClaimed(user, amount)`                                                    | `claimSupplyInterest()`, and implicitly `withdrawCollateral()` | depositor interest payout                                      |
 
-`LoanCreated` and the per-loan `Repaid` are the two the frontend genuinely depends on rather than merely logs: they carry the `loanId` and locked rates that the off-chain ledger keys off (§9.5.2, §9.5.3). The rest are what `LoanTransaction` rows mirror ([8.4](#84-table-by-table-walkthrough)) and what the public Explorer (Section 7.6) filters by type.
+The frontend depends on `LoanCreated` and the per-loan `Repaid` rather than just logging them: they carry the `loanId` and locked rates the off-chain ledger keys off (§9.5.2, §9.5.3). The rest are what `LoanTransaction` rows mirror ([8.4](#84-table-by-table-walkthrough)) and what the public Explorer (Section 7.6) filters by type.
 
 ### 9.5 Core Function Walkthroughs
 
@@ -247,9 +247,9 @@ function borrow(uint256 myrAmount, uint256 termDays) external whenNotPaused nonR
 }
 ```
 
-Three guards run in a deliberate order. The per-user LTV check comes **before** the pool-cap check so that the more common and more actionable message (`"Exceeds max LTV"`) is the one a borrower normally sees, rather than a protocol-wide condition they can do nothing about.
+The order of the three guards matters. The per-user LTV check runs before the pool-cap check, so a borrower normally sees `"Exceeds max LTV"`, which they can act on, instead of a protocol-wide condition they cannot.
 
-The rate is captured **before** `totalBorrowed` grows on the next line. That ordering is the whole reason `LoanCreated` carries the rates at all: the loan locks the utilisation the pool had when the borrower committed, not the utilisation their own borrow creates. A `currentAprBps()` read taken *after* the transaction therefore comes back **higher** than what the loan is actually charged, which is precisely the bug the bridge below avoids:
+The rate is captured before `totalBorrowed` grows on the next line. That ordering is why `LoanCreated` carries the rates: the loan locks the utilisation the pool had when the borrower committed, not the utilisation their own borrow creates. A `currentAprBps()` read taken *after* the transaction therefore comes back **higher** than what the loan is actually charged, which is precisely the bug the bridge below avoids:
 
 ```ts
 const TERM_DAYS: Record<number, number> = { 1: 30, 3: 90, 6: 180, 12: 365 };
@@ -363,7 +363,7 @@ function _repayOne(address user, uint256 loanId, uint256 myrAmount) internal ret
 
 Two properties fall out of this that matter for the UI. Each loan is capped at **its own** total due, so over-quoting a full payoff can never overcharge; and inactive loans are silently skipped rather than reverting the whole batch.
 
-There is **no `onlyKYC` modifier**. A user must always be able to pay off debt, even if their verification lapsed.
+There is no `onlyKYC` modifier. A user must always be able to pay off debt, even if their verification lapsed.
 
 The bridge takes a list of `{ loanId, amount, rowId }` items and picks the single- or multi-loan entry point automatically:
 
@@ -373,7 +373,7 @@ const repayTx = loanIds.length === 1
   : await c.loan.repayMany(loanIds, amounts);
 ```
 
-For a **full settlement** it re-quotes each loan's real payoff from the chain and then pads it by one accrual day, because the repay transaction mines seconds later and may cross a Malaysia-midnight boundary, ticking interest up a step after the quote was taken. Since the contract caps each loan at its true due, over-quoting the *approval* costs nothing, while under-quoting is exactly what leaves sen of principal behind:
+For a full settlement it re-quotes each loan's real payoff from the chain and then pads it by one accrual day, because the repay transaction mines seconds later and may cross a Malaysia-midnight boundary, ticking interest up a step after the quote was taken. Since the contract caps each loan at its true due, over-quoting the *approval* costs nothing, while under-quoting is exactly what leaves sen of principal behind:
 
 ```ts
 const dues = await Promise.all(items.map(i =>
@@ -388,7 +388,7 @@ amounts = items.map((it, idx) => {
 });
 ```
 
-Afterwards the **per-loan** `Repaid` events are decoded into a map, which is what lets each ledger row be settled with exactly the principal its own loan reported, so the DB can no longer drift from the chain:
+Afterwards the per-loan `Repaid` events are decoded into a map, so each ledger row is settled with the principal its own loan reported and the DB cannot drift from the chain:
 
 ```ts
 const paidByLoan = new Map<number, { principal: bigint; interest: bigint }>();
@@ -437,7 +437,7 @@ function withdrawCollateral(uint256 weiAmount) external whenNotPaused nonReentra
 }
 ```
 
-Because collateral is one shared pot, the LTV guard runs against `_activePrincipal()`, the **sum** of every still-active loan, not any single loan. The bridge decodes the (possible) `SupplyInterestClaimed` log emitted alongside `CollateralWithdrawn` so a full exit reports both amounts in one line, rather than looking like the interest was forfeited:
+Because collateral is one shared pot, the LTV guard runs against `_activePrincipal()`, the sum of every still-active loan, not any single loan. The bridge decodes the (possible) `SupplyInterestClaimed` log emitted alongside `CollateralWithdrawn` so a full exit reports both amounts in one line, rather than looking like the interest was forfeited:
 
 ```ts
 const claimEvt = (receipt?.logs ?? [])
@@ -493,7 +493,7 @@ function claimSupplyInterest() external whenNotPaused nonReentrant {
 }
 ```
 
-Lets a depositor claim their share of borrow-side interest (38% of the current effective borrow rate, §9.7) without touching their collateral or any loan. The accrual clock simply resets to `now`.
+Lets a depositor claim their share of borrow-side interest (38% of the current effective borrow rate, §9.7) without touching their collateral or any loan. The accrual clock resets to `now`.
 
 ```ts
 const claimSupplyInterest = useCallback(async () => {
@@ -518,6 +518,8 @@ const claimSupplyInterest = useCallback(async () => {
 
 ### 9.6 Admin & Oracle Functions
 
+Every privileged function on the contract is gated by one role. In Solidity that role is the `Ownable2Step` owner and the modifier is spelled `onlyOwner`, but in this system it is the **admin**: the deploying address, whose key the server holds as `OWNER_PRIVATE_KEY`, and which the admin panel in Section 7.12 acts through. There is no second privileged role and no separate "owner" person. Wherever this document says admin, the code says `onlyOwner`.
+
 | Function                      | Guard       | Effect                                                                                                  |
 | ----------------------------- | ----------- | ------------------------------------------------------------------------------------------------------- |
 | `setKYC(user, approved)`      | `onlyOwner` | Grants/revokes on-chain borrowing permission for a wallet                                               |
@@ -528,9 +530,9 @@ const claimSupplyInterest = useCallback(async () => {
 | `pause()` / `unpause()`       | `onlyOwner` | Emergency stop / resume for every `whenNotPaused` function                                              |
 | `withdrawProtocolFees(to)`    | `onlyOwner` | Pays accumulated interest revenue out in MYR (the Overview page's treasury button, Section 7.12)        |
 
-Two of these are exercised automatically by the server using `OWNER_PRIVATE_KEY`, rather than by a human clicking a contract call.
+Two of these are called automatically by the server, not by an admin clicking a contract call.
 
-**KYC approval**, via [`web/src/lib/kyc/chain.ts`](../../../web/src/lib/kyc/chain.ts), wraps `setKYC()` so the user never pays gas or signs anything to get approved:
+**KYC approval**, via `web/src/lib/kyc/chain.ts`, wraps `setKYC()` so the user never pays gas or signs anything to get approved:
 
 ```solidity
 function setKYC(address user, bool approved) external onlyOwner {
@@ -558,7 +560,7 @@ if (!entitled) return NextResponse.json({ error: 'KYC not approved.' }, { status
 await setKycOnChain(user.walletAddress.toLowerCase(), true);
 ```
 
-**Price & rate oracle**, via [`web/src/lib/price-sync.ts`](../../../web/src/lib/price-sync.ts), drives `setEthPrice()` and `setBaseRate()`:
+**Price & rate oracle**, via `web/src/lib/price-sync.ts`, drives `setEthPrice()` and `setBaseRate()`:
 
 ```solidity
 function setEthPrice(uint256 _price) external onlyOwner {
@@ -600,7 +602,7 @@ export function syncEthPriceDeduped(): Promise<SyncResult> {
 }
 ```
 
-`setSupplyCap()` carries a guard worth understanding, since it protects against a state with no way out:
+`setSupplyCap()` guards against a state the protocol cannot recover from:
 
 ```solidity
 function setSupplyCap(uint256 newCap) external onlyOwner {
@@ -609,13 +611,13 @@ function setSupplyCap(uint256 newCap) external onlyOwner {
 }
 ```
 
-A cap under the outstanding debt would push `utilizationBps()` to 100%, instantly pinning every **new** borrow at `MAX_BASE_RATE_BPS` (while existing loans keep their locked rate), with no way to lend out of it.
+A cap under the outstanding debt would push `utilizationBps()` to 100%, instantly pinning every new borrow at `MAX_BASE_RATE_BPS` (while existing loans keep their locked rate), with no way to lend out of it.
 
 ### 9.7 View Functions, Health Factor & Interest Model
 
 | Function                             | Returns                                                                                                         |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `currentAprBps()`                    | Live APR for a **new** borrow: `baseRateBps + utilPremiumBps()`, clamped to `MAX_BASE_RATE_BPS`                  |
+| `currentAprBps()`                    | Live APR for a new borrow: `baseRateBps + utilPremiumBps()`, clamped to `MAX_BASE_RATE_BPS`                  |
 | `utilizationBps()`                   | Share of the pool lent out (0–10,000), `totalBorrowed / supplyCap`                                              |
 | `utilPremiumBps()`                   | The utilisation premium alone, exposed so the UI can show it as its own line without re-implementing the formula |
 | `availableToBorrowPool()`            | MYR still lendable before the pool cap is reached                                                               |
@@ -626,7 +628,7 @@ A cap under the outstanding debt would push `utilizationBps()` to 100%, instantl
 | `healthFactor(user)`                 | See below                                                                                                       |
 | `availableToBorrow(user)`            | Remaining borrowable MYR at `MAX_LTV`, against the shared pot                                                   |
 | `currentLTV(user)`                   | The account's loan-to-value, as a whole-number percentage                                                       |
-| `isLoanLiquidatable(user, id)`       | `(liquidatable, unhealthy, overdue)`: whether, and **why** (§9.8)                                               |
+| `isLoanLiquidatable(user, id)`       | `(liquidatable, unhealthy, overdue)`: whether, and why (§9.8)                                               |
 | `getUserLoans(user)`                 | The whole loan book plus each loan's live interest; inactive loans included so ids stay stable                  |
 | `loanCount(user)`                    | Length of the loan array                                                                                        |
 | `getPosition(user)`                  | Minimal `(collateral, principal)` pair, for server-side guards like the wallet-unlink check                     |
@@ -651,7 +653,7 @@ function currentAprBps() public view returns (uint256) {
 }
 ```
 
-This prices **new borrows only**. Each loan locks the figure into `loan.aprBps` at creation and accrues at that fixed rate for its whole life. The Repay tab's per-plan interest, the payoff quote and the ledger all read the *locked* rate, never this one.
+This prices new borrows only. Each loan locks the figure into `loan.aprBps` at creation and accrues at that fixed rate for its whole life. The Repay tab's per-plan interest, the payoff quote and the ledger all read the *locked* rate, never this one.
 
 **Health factor**, in `_healthFactor()`, runs against the aggregate:
 
@@ -672,9 +674,9 @@ const hfRaw = info[2] as bigint;
 const hf = hfRaw === MAX_U ? Infinity : Number(hfRaw) / 1e18;
 ```
 
-This is exactly the number the plain-English risk sentence on the Dashboard ("At Risk: liquidates if ETH falls to or below RM X") and the Portfolio's escalating risk banner (Section 7.5) are both derived from.
+Both the plain-English risk sentence on the Dashboard ("At Risk: liquidates if ETH falls to or below RM X") and the Portfolio's escalating risk banner (Section 7.5) are derived from this number.
 
-**Interest accrual** is the part that changed most, and the reasoning is worth reproducing. Interest ticks once per **calendar day**, anchored to Malaysia midnight, so the figure the UI quotes is exactly the figure the contract charges, not a per-second value that has already moved by the time the user signs:
+**Interest accrual** ticks once per calendar day, anchored to Malaysia midnight, so the figure the UI quotes is the figure the contract charges. A per-second rate would already have moved by the time the user signs:
 
 ```solidity
 function _loanInterest(Loan storage loan) internal view returns (uint256) {
@@ -688,7 +690,7 @@ function _loanInterest(Loan storage loan) internal view returns (uint256) {
 }
 ```
 
-Note it is `loan.aprBps`, not `currentAprBps()`: each loan accrues at the rate it was born with. The `firstAccrual` guard is subtler than it looks: the minimum-one-day floor must apply before a loan's first ever repayment (a same-day borrow-then-repay still owes that day), but must **not** apply to a same-day *repeat* repay. Since `lastRepayTime` resets on every repayment, without that guard two partial payments minutes apart would each be charged a full phantom day of interest, silently eating every partial payment.
+The rate used is `loan.aprBps`, not `currentAprBps()`, so each loan accrues at the rate it was born with. The `firstAccrual` guard handles one specific case. The minimum-one-day floor must apply before a loan's first repayment, since a same-day borrow-then-repay still owes that day, but it must not apply to a same-day *repeat* repay. Since `lastRepayTime` resets on every repayment, without that guard two partial payments minutes apart would each be charged a full phantom day of interest, silently eating every partial payment.
 
 Supply-side interest uses the same whole-day flooring but on a plain rolling window (UTC, not local-midnight anchored), at 38% of the current effective rate:
 
@@ -702,7 +704,7 @@ Tying supply yield to `currentAprBps()` rather than the flat base rate means len
 
 ### 9.8 Liquidation
 
-`liquidate(borrower, loanId, debtAmount)` is whitelisted-liquidator-only and targets **one loan**, accepting it for either of two independent reasons:
+`liquidate(borrower, loanId, debtAmount)` is whitelisted-liquidator-only and targets one loan, accepting it for either of two independent reasons:
 
 ```solidity
 bool unhealthy = _healthFactor(borrower) < MIN_HEALTH;
@@ -713,7 +715,7 @@ require(unhealthy || overdue, "Not liquidatable");
 | Path                     | Trigger                                                        | Notes                                                                      |
 | ------------------------ | -------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | **A. Collateral unsafe** | Account health factor < 1 (ETH fell, or debt outgrew collateral) | Applies to *any* active loan of that account, at any time                  |
-| **B. Loan overdue**      | This loan's `dueDate + GRACE_PERIOD` has passed, still unpaid    | Applies **even if the collateral is perfectly healthy**; this is the maturity path fixed-term lending needs |
+| **B. Loan overdue**      | This loan's `dueDate + GRACE_PERIOD` has passed, still unpaid    | Applies even if the collateral is perfectly healthy; this is the maturity path fixed-term lending needs |
 
 The liquidator repays up to `debtAmount` of that loan's debt and receives the equivalent collateral value plus the 5% `LIQ_BONUS`. Only enough collateral to cover what was actually repaid is seized; the remainder stays in the borrower's pot, withdrawable once their remaining debt allows. If the pot can't cover `covering + bonus`, the contract scales the MYR pulled from the liquidator *down* to match what's actually seizable, so a liquidator is never charged for collateral they don't receive:
 
@@ -725,11 +727,11 @@ if (seize > collateralOf[borrower]) {
 }
 ```
 
-`isLoanLiquidatable()` exposes the same two booleans as a view, so the dashboard can label a loan not just as at-risk but with *which* reason applies. There is still no liquidator-facing UI in the app; the overdue path is demonstrable on a local chain using `time-travel.ts` ([6.7](#67-post-deploy-operations)).
+`isLoanLiquidatable()` exposes the same two booleans as a view, so the dashboard can label a loan not just as at-risk but with *which* reason applies. There is still no liquidator-facing UI in the app; the overdue path can be demonstrated on a local chain by advancing the Hardhat clock.
 
 ### 9.9 Supporting Contracts
 
-**[`MockMYR.sol`](../../../blockchain/contracts/MockMYR.sol)**, the 6-decimal ERC-20 that `CryptoLoan` mints on every `borrow()`, `buyMYR()`, and interest payout. Minting is restricted to a single `minter` address, fixed at construction time to whichever contract deployed it:
+**`MockMYR.sol`**, the 6-decimal ERC-20 that `CryptoLoan` mints on every `borrow()`, `buyMYR()`, and interest payout. Minting is restricted to a single `minter` address, fixed at construction time to whichever contract deployed it:
 
 ```solidity
 contract MockMYR is ERC20 {
@@ -745,7 +747,7 @@ contract MockMYR is ERC20 {
 
 Since `CryptoLoan`'s constructor is the one calling `new MockMYR()`, `minter` is always `CryptoLoan`'s own address. There is no separate `setMinter()` step, and no path for any other contract or EOA to mint MYR. `MockUSDC.sol` is an unused sibling with an identical shape (also 6-decimal, same minter pattern); it is not wired into `CryptoLoan` or referenced by the frontend.
 
-**`ICO.sol` / `RinggitToken.sol`**, a separate demo behind the `/ico` page, unrelated to the lending protocol proper (see [6.8](#68-optional-ico-demo-deployment)). `RinggitToken` is a standard 18-decimal ERC-20 (`MYRC`) that mints its entire fixed supply to the deployer at construction. `ICO` sells that supply for ETH at a fixed price set at deploy time, using `safeTransferFrom(owner() → buyer)` against an allowance the deployer grants it. The ICO contract never custodies the token supply itself, only an approval to move it:
+**`ICO.sol` / `RinggitToken.sol`**, a separate demo behind the `/ico` page, unrelated to the lending protocol proper. `RinggitToken` is a standard 18-decimal ERC-20 (`MYRC`) that mints its entire fixed supply to the deployer at construction. `ICO` sells that supply for ETH at a fixed price set at deploy time, using `safeTransferFrom(owner() → buyer)` against an allowance the deployer grants it. The ICO contract never custodies the token supply itself, only an approval to move it:
 
 ```solidity
 function buyToken() external payable whenNotPaused {
